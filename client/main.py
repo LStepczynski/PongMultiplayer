@@ -1,5 +1,6 @@
 from config import Colors, Game_properties as gp
 from objects import Racket
+import threading
 import pygame as pg
 import socket
 
@@ -20,11 +21,12 @@ class Game:
         message = "Hello, server!"
         self.client_socket.send(message.encode())
 
-        self.player = Racket(self.root, (50, 50), (50, 100))
-
+        self.player = Racket(self.root, (50, gp.HEIGHT//2-100), (50, 200))
+        self.enemy = Racket(self.root, (gp.WIDTH-100, gp.HEIGHT//2-100), (50, 200))
 
         self.clock = pg.time.Clock()
         self.run = True
+        threading.Thread(target=self.controll_enemy).start()
         while self.run:
             self.clock.tick(gp.TICK_RATE)
             for event in pg.event.get():
@@ -45,6 +47,7 @@ class Game:
     def draw(self):
         self.root.fill(Colors.BLACK)
         self.player.draw()
+        self.enemy.draw()
 
     def tick(self, keys_pressed):
         if keys_pressed[pg.K_w]:
@@ -57,5 +60,14 @@ class Game:
             self.client_socket.send('w'.encode())
         if keys_pressed[pg.K_s]:
             self.client_socket.send('s'.encode())
+        
+    def controll_enemy(self):
+        while self.run:
+            message = self.client_socket.recv(1024).decode()
+            for letter in message:
+                if letter == 'w':
+                    self.enemy.tick('up')
+                elif letter == 's':
+                    self.enemy.tick('down')
 
-Game(('localhost', 12345), input("name: "))
+Game(('192.168.0.89', 12345), input("name: "))
