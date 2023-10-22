@@ -7,6 +7,8 @@ class Server:
         self.server_socket = server_socket
         self.server_address = server_address
 
+        self.connected_clients = []
+
         self.server_socket.bind(self.server_address)
 
         self.server_socket.listen(2)
@@ -16,15 +18,22 @@ class Server:
         while self.run:
             # Wait for a client to connect
             client_socket, client_address = self.server_socket.accept()
-            threading.Thread(target=self.handle_client, args=(client_socket, client_address,)).start()
+            self.connected_clients.append((client_socket, client_address))
+            threading.Thread(target=self.handle_client, 
+                             args=(client_socket, 
+                                   client_address, 
+                                   len(self.connected_clients)-1)).start()
 
-    def handle_client(self, socket, address):
+    def handle_client(self, socket, address, index):
         print(f"Connection from {address} established.")
         socket.send('Welcome'.encode())
         
         try:
             while True:
                 response = socket.recv(1024)
+                for client_socket, client_address in self.connected_clients:
+                    if (client_socket, client_address) != (socket, address):
+                        client_socket.send(response)
                 if not response:
                     break  # No more data from the client, exit the loop
                 print(response.decode())
@@ -32,6 +41,7 @@ class Server:
             pass  # Handle the case where the client abruptly disconnects
         
         print(f"Connection from {address} closed.")
+        self.connected_clients.remove((socket, address))
         socket.close()
 
 
