@@ -1,5 +1,7 @@
-import threading
 import socket as sk
+import threading
+import pickle
+import random
 
 
 class Server:
@@ -8,6 +10,8 @@ class Server:
         self.server_address = server_address
 
         self.connected_clients = []
+        self.game_rooms = []
+        self.waiting = False
 
         self.server_socket.bind(self.server_address)
 
@@ -16,27 +20,42 @@ class Server:
 
         self.run = True
         while self.run:
+            print(self.connected_clients)
+            print(self.game_rooms)
             # Wait for a client to connect
             client_socket, client_address = self.server_socket.accept()
-            self.connected_clients.append((client_socket, client_address))
-            threading.Thread(target=self.handle_client, 
-                             args=(client_socket, 
-                                   client_address, 
-                                   len(self.connected_clients)-1)).start()
 
-    def handle_client(self, socket, address, index):
+            # Handles creating and joining game rooms
+            if self.waiting:
+                self.game_rooms[-1][1] = (client_socket, client_address)
+                direction = [bool(random.randint(0, 1)), bool(random.randint(0, 1))]
+                self.game_rooms[-1][0][0].send(pickle.dumps(direction))
+                self.game_rooms[-1][1][0].send(pickle.dumps([not direction[0], direction[1]]))
+            else:
+                self.game_rooms.append([(client_socket, client_address), None])
+            
+            self.waiting = not self.waiting
+
+            # Appends the client to the connected clients
+            self.connected_clients.append((client_socket, client_address))
+
+            # Starts a thread that will handle the client
+            threading.Thread(target=self.handle_client, 
+                            args=(client_socket, 
+                                client_address)).start()
+
+    def handle_client(self, socket, address):
         print(f"Connection from {address} established.")
-        socket.send('Welcome'.encode())
         
         try:
             while True:
-                response = socket.recv(1024)
+                response = socket.recv(1024).decode()
                 for client_socket, client_address in self.connected_clients:
                     if (client_socket, client_address) != (socket, address):
-                        client_socket.send(response)
+                        client_socket.send(("enemy:"+response).encode())
                 if not response:
                     break  # No more data from the client, exit the loop
-                print(response.decode())
+                print(response)
         except ConnectionResetError:
             pass  # Handle the case where the client abruptly disconnects
         

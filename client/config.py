@@ -27,4 +27,5 @@ class Game_properties():
     TICK_RATE = 30
     TITLE = 'Pong by LSTEP'
     VELOCITY = 10
+    BALL_VELOCITY = 5
     BACKGROUND_COLOR = Colors.BEIGE
