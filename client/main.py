@@ -1,7 +1,8 @@
 from config import Colors, Game_properties as gp
-from objects import Racket
+from objects import Racket, Ball
 import threading
 import pygame as pg
+import pickle
 import socket
 
 
@@ -15,18 +16,20 @@ class Game:
         pg.display.set_caption(gp.TITLE)
 
         self.client_socket.connect(server_address)
-        welcome_message = self.client_socket.recv(1024)
-        print(welcome_message.decode())
+
+        self.ball_direction = pickle.loads(self.client_socket.recv(1024))
+        print(self.ball_direction)
 
         message = "Hello, server!"
         self.client_socket.send(message.encode())
 
         self.player = Racket(self.root, (50, gp.HEIGHT//2-100), (50, 200))
         self.enemy = Racket(self.root, (gp.WIDTH-100, gp.HEIGHT//2-100), (50, 200))
+        self.ball = Ball(self.root, (gp.WIDTH//2-25, gp.HEIGHT//2-25), (50, 50))
 
         self.clock = pg.time.Clock()
         self.run = True
-        threading.Thread(target=self.controll_enemy).start()
+        threading.Thread(target=self.recieve_commads).start()
         while self.run:
             self.clock.tick(gp.TICK_RATE)
             for event in pg.event.get():
@@ -48,12 +51,14 @@ class Game:
         self.root.fill(Colors.BLACK)
         self.player.draw()
         self.enemy.draw()
+        self.ball.draw()
 
     def tick(self, keys_pressed):
         if keys_pressed[pg.K_w]:
             self.player.tick('up')
         elif keys_pressed[pg.K_s]:
             self.player.tick('down')
+        self.ball.tick(self.ball_direction)
 
     def send_commands(self, keys_pressed):
         if keys_pressed[pg.K_w]:
@@ -61,13 +66,15 @@ class Game:
         if keys_pressed[pg.K_s]:
             self.client_socket.send('s'.encode())
         
-    def controll_enemy(self):
+    def recieve_commads(self):
         while self.run:
             message = self.client_socket.recv(1024).decode()
-            for letter in message:
-                if letter == 'w':
-                    self.enemy.tick('up')
-                elif letter == 's':
-                    self.enemy.tick('down')
+            if message.startswith('enemy:'):
+                message.replace("enemy:", "")
+                for letter in message:
+                    if letter == 'w':
+                        self.enemy.tick('up')
+                    elif letter == 's':
+                        self.enemy.tick('down')
 
-Game(('192.168.0.89', 12345), input("name: "))
+Game(('localhost', 12345), input("name: "))
