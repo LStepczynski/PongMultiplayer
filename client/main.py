@@ -17,12 +17,6 @@ class Game:
 
         self.client_socket.connect(server_address)
 
-        self.ball_direction = pickle.loads(self.client_socket.recv(1024))
-        print(self.ball_direction)
-
-        message = "Hello, server!"
-        self.client_socket.send(message.encode())
-
         self.player = Racket(self.root, (50, gp.HEIGHT//2-100), (50, 200))
         self.enemy = Racket(self.root, (gp.WIDTH-100, gp.HEIGHT//2-100), (50, 200))
         self.ball = Ball(self.root, (gp.WIDTH//2-25, gp.HEIGHT//2-25), (50, 50))
@@ -35,14 +29,13 @@ class Game:
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     self.run = False
-                    self.client_socket.send("siemano".encode())
                     self.client_socket.close()
 
             keys_pressed = pg.key.get_pressed()
-    
+
             self.send_commands(keys_pressed)
             self.draw()
-            self.tick(keys_pressed)
+
 
             pg.display.update()
             
@@ -53,28 +46,21 @@ class Game:
         self.enemy.draw()
         self.ball.draw()
 
-    def tick(self, keys_pressed):
-        if keys_pressed[pg.K_w]:
-            self.player.tick('up')
-        elif keys_pressed[pg.K_s]:
-            self.player.tick('down')
-        self.ball.tick(self.ball_direction)
-
     def send_commands(self, keys_pressed):
         if keys_pressed[pg.K_w]:
-            self.client_socket.send('w'.encode())
+            self.client_socket.send(pickle.dumps('w'))
+            print('w')
         if keys_pressed[pg.K_s]:
-            self.client_socket.send('s'.encode())
+            self.client_socket.send(pickle.dumps('s'))
+            print('a')
+        else:
+            self.client_socket.send(pickle.dumps(''))
         
     def recieve_commads(self):
         while self.run:
-            message = self.client_socket.recv(1024).decode()
-            if message.startswith('enemy:'):
-                message.replace("enemy:", "")
-                for letter in message:
-                    if letter == 'w':
-                        self.enemy.tick('up')
-                    elif letter == 's':
-                        self.enemy.tick('down')
+            info = pickle.loads(self.client_socket.recv(1024))
+            self.player.set(info[0])
+            self.enemy.set(info[1])
+            self.ball.set(info[2])
 
-Game(('localhost', 12345), input("name: "))
+Game(('192.168.0.89', 12345), input("name: "))

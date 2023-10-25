@@ -10,11 +10,9 @@ class Racket(pg.Rect):
     def draw(self):
         pg.draw.rect(self.surface, Colors.WHITE, self)
 
-    def tick(self, direction):
-        if direction == 'up':
-            self.y -= gv.VELOCITY
-        elif direction == 'down':
-            self.y += gv.VELOCITY
+    def set(self, position):
+        self.x = position[0]
+        self.y = position[1]
 
 
 
@@ -26,16 +24,8 @@ class Ball(pg.Rect):
     def draw(self):
         pg.draw.rect(self.surface, Colors.GRAY, self)
 
-    def tick(self, direction):
-        if direction == [True, True]:
-            self.y -= gv.BALL_VELOCITY
-            self.x += gv.BALL_VELOCITY
-        if direction == [True, False]:
-            self.y += gv.BALL_VELOCITY
-            self.x += gv.BALL_VELOCITY
-        if direction == [False, True]:
-            self.y -= gv.BALL_VELOCITY
-            self.x -= gv.BALL_VELOCITY
-        if direction == [False, False]:
-            self.y += gv.BALL_VELOCITY
-            self.x -= gv.BALL_VELOCITY
+    def set(self, position):
+        self.x = position[0]
+        self.y = position[1]
+        self.width = position[2]
+        self. height = position[3]
