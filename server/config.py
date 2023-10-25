@@ -22,8 +22,8 @@ class Colors():
 
 class Game_properties():
     """Class that stores all the game properties"""
-    WIDTH = 1030
-    HEIGHT = 770
+    WIDTH = 1024
+    HEIGHT = 768
     TICK_RATE = 30
     TITLE = 'Pong by LSTEP'
     VELOCITY = 10

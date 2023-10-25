@@ -1,7 +1,10 @@
+from config import Game_properties as gp
+from game_room import Game_room
 import socket as sk
 import threading
 import pickle
 import random
+import time
 
 
 class Server:
@@ -28,9 +31,7 @@ class Server:
             # Handles creating and joining game rooms
             if self.waiting:
                 self.game_rooms[-1][1] = (client_socket, client_address)
-                direction = [bool(random.randint(0, 1)), bool(random.randint(0, 1))]
-                self.game_rooms[-1][0][0].send(pickle.dumps(direction))
-                self.game_rooms[-1][1][0].send(pickle.dumps([not direction[0], direction[1]]))
+                threading.Thread(target=self.handle_game, args=(self.game_rooms[-1],)).start()
             else:
                 self.game_rooms.append([(client_socket, client_address), None])
             
@@ -39,27 +40,27 @@ class Server:
             # Appends the client to the connected clients
             self.connected_clients.append((client_socket, client_address))
 
-            # Starts a thread that will handle the client
-            threading.Thread(target=self.handle_client, 
-                            args=(client_socket, 
-                                client_address)).start()
+    def handle_game(self, game_room):
+        Game_room(game_room)
 
-    def handle_client(self, socket, address):
+
+
+    def handle_client(self, socket, address, event):
         print(f"Connection from {address} established.")
         
         try:
-            while True:
-                response = socket.recv(1024).decode()
+            while not event.is_set():
+                response = pickle.loads(socket.recv(1024))
                 for client_socket, client_address in self.connected_clients:
                     if (client_socket, client_address) != (socket, address):
-                        client_socket.send(("enemy:"+response).encode())
+                        client_socket.send(pickle.dumps("enemy:"+response))
                 if not response:
                     break  # No more data from the client, exit the loop
                 print(response)
         except ConnectionResetError:
             pass  # Handle the case where the client abruptly disconnects
-        
-        print(f"Connection from {address} closed.")
+        print('DEL')
+        event.set()
         self.connected_clients.remove((socket, address))
         socket.close()
 
