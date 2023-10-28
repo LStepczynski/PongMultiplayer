@@ -1,7 +1,11 @@
-import pickle
+class test:
+    def __init__(self) -> None:
+        self.s = 1
 
-var = pickle.dumps(['hej'])
 
-var2 = pickle.loads(var)
-
-print(type(var2))
+awd = ["siema"]
+print(awd)
+awd.append('123')
+print(awd)
+awd.append(test())
+print(awd)
