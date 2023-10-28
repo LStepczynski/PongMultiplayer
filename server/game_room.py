@@ -13,57 +13,68 @@ class Client:
         self.enemy = enemy
         self.ball = ball
         self.info = None
-        self.connected = True
     
     def receive_info(self, info):
+        """Receive input from the client"""
         try:
             self.info = pickle.loads(info)
-            print(self.info)
             self.update_player()
+
         except Exception as e:
             print(e, 1)
 
     def send_info(self):
+        """Send info to the client"""
         try:
+            # Positions of the rackets and the ball
             self.game_room.server_socket.sendto(pickle.dumps((self.player, self.enemy, self.ball)), self.address)
+
         except Exception as e:
-            self.connected = False
             self.game_room.run = False
             print(e, 2)
 
-    def update(self, direction):
-        self.update_ball(direction)
-        self.update_player()
-    
+
     def update_ball(self, direction):
+        """Handles the movement of the ball"""
+
         for _ in range(10):
             if direction == [True, True]:
                 self.ball[1] -= gp.BALL_VELOCITY/10
                 self.ball[0] += gp.BALL_VELOCITY/10
+
             if direction == [True, False]:
                 self.ball[1] += gp.BALL_VELOCITY/10
                 self.ball[0] += gp.BALL_VELOCITY/10
+
             if direction == [False, True]:
                 self.ball[1] -= gp.BALL_VELOCITY/10
                 self.ball[0] -= gp.BALL_VELOCITY/10
+
             if direction == [False, False]:
                 self.ball[1] += gp.BALL_VELOCITY/10
                 self.ball[0] -= gp.BALL_VELOCITY/10
 
+
             if self.ball[0] - gp.BALL_VELOCITY + 5 <= 0:
                 direction[0] = True
+
             if self.ball[0] + gp.BALL_VELOCITY + self.ball[2] - 5 >= gp.WIDTH:
                 direction[0] = False
 
+
             if self.ball[0] - gp.BALL_VELOCITY + 5 <= self.player[0] + self.player[2] and (self.ball[1] > self.player[1] and self.ball[1] < self.player[1] + self.player[3]):
                 direction[0] = True
+
             if self.ball[0] + gp.BALL_VELOCITY + self.ball[2] - 5 >= self.enemy[0] and (self.ball[1] > self.enemy[1] and self.ball[1] < self.enemy[1] + self.enemy[3]):
                 direction[0] = False
 
+
             if self.ball[1] - gp.BALL_VELOCITY + 5 <= 0:
                 direction[1] = False
+
             if self.ball[1] + gp.BALL_VELOCITY + self.ball[3] - 5 >= gp.HEIGHT:
                 direction[1] = True
+
 
     def update_player(self):
         if self.info == None:
@@ -76,9 +87,6 @@ class Client:
             if char == 's':
                 self.player[1] += gp.VELOCITY
 
-    def disconect(self):
-        self.socket.close()
-        self.connected = False
 
         
 
@@ -89,6 +97,7 @@ class Game_room:
         self.game_room = game_room
         self.server_socket = server_socket
 
+        # Create the client objects
         self.client1 = Client(self,
                               game_room[0],  # Client address
                               [50, gp.HEIGHT // 2 - 100, 50, 200],
@@ -101,12 +110,15 @@ class Game_room:
                               [gp.WIDTH - 100, gp.HEIGHT // 2 - 100, 50, 200],
                               [gp.WIDTH // 2 - 25, gp.HEIGHT // 2 - 25, 50, 50])
 
+        # Decide the initial direction of the ball
         self.direction = [bool(random.randint(0, 1)), bool(random.randint(0, 1))]
 
+        # Start the main loop 
         self.loop_thread = threading.Thread(target=self.main_loop)
         self.loop_thread.start()
 
     def main_loop(self):
+        """Main loop of the program"""
         while self.run:
             try:
                 self.client1.update_ball(self.direction)
@@ -120,6 +132,7 @@ class Game_room:
                 self.client1.info = None
                 self.client2.info = None
                 time.sleep(1 / gp.TICK_RATE)
+                
             except Exception as e:  # General exception to catch any error
                 self.run = False
                 print(f"An error occurred: {e}")

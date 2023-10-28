@@ -6,43 +6,52 @@ import time
 
 
 class Server:
-    def __init__(self, server_socket1, server_address1, server_socket2, server_address2):
-        self.server_socket1 = server_socket1
-        self.server_address1 = server_address1
+    def __init__(self, server_input_socket: sk.socket, server_input_address, 
+                 server_init_socket: sk.socket, server_init_address):
+        
+        # Socket used for the game
+        self.server_input_socket = server_input_socket 
+        self.server_input_address = server_input_address
 
-        self.server_socket2 = server_socket2
-        self.server_address2 = server_address2
+        # Socket used to init a connection
+        self.server_init_socket = server_init_socket
+        self.server_init_address = server_init_address
 
         self.connected_clients = []
         self.game_rooms = []
-        self.waiting = False
+        self.waiting = False # Variable storing if someone is waiting for a game
 
-        self.server_socket1.bind(self.server_address1)
-        self.server_socket2.bind(self.server_address2)
-        self.server_socket1.settimeout(0.1)
-        self.server_socket2.settimeout(0.1)
-
+        self.server_input_socket.bind(self.server_input_address)
+        self.server_init_socket.bind(self.server_init_address)
         
         print("Server is listening for connections...")
 
         self.run = True
         while self.run:
-            # Wait for a client to send data
-            try:
-                data, client_address = self.server_socket2.recvfrom(1024)
-            except TimeoutError:
-                continue
-            if client_address in self.connected_clients:
-                continue
-            
-            threading.Thread(target=self.handle_messages).start()
-            print(self.connected_clients)
-            print(self.game_rooms)
+            # Wait for a client to connect
+            self.server_init_socket.listen()
+
+            connection, client_address = self.server_init_socket.accept()
+            connection.settimeout(15)
+
+            # Create a threading event
+            e = threading.Event()
+
+            # Start lisening for input
+            t1 = threading.Thread(target=self.handle_messages, args=(e,))
+            t1.start()
+
+            # Start tesing the connection
+            t2 = threading.Thread(target=self.handle_connection, args=(connection, e, client_address,))
+            t2.start()
+            print('a')
+
 
             # Handles creating and joining game rooms
             if self.waiting:
                 self.game_rooms[-1][1] = client_address
                 threading.Thread(target=self.handle_game, args=(self.game_rooms[-1],)).start()
+
             else:
                 self.game_rooms.append([client_address, None])
             
@@ -51,39 +60,56 @@ class Server:
             # Appends the client to the connected clients
             self.connected_clients.append(client_address)
 
-    def handle_game(self, game_room):
-        self.game_rooms[-1].append(Game_room(game_room, self.server_socket1))
 
-    def handle_messages(self):
+    def handle_game(self, game_room):
+        self.game_rooms[-1].append(Game_room(game_room, self.server_input_socket))
+
+
+    def handle_connection(self, connection: sk.socket, event: threading.Event, address):
         while self.run:
-            print('a')
+            print(self.connected_clients)
+            print(self.game_rooms, "--- game")
             try:
-                data, client_address = self.server_socket1.recvfrom(1024)
-                print(data, client_address)
-            except TimeoutError:
-                continue
-            time1 = time.time()
+                print(connection.recv(1024), "<---------")
+            except Exception as e:
+                print(e, "ODLLLLLLLLLLLLLLOMCASWDWADAWDWA")
+                connection.close()
+                event.set()
+                self.waiting = not self.waiting
+                self.connected_clients.remove(address)
+                for room in self.game_rooms:
+                    if address in room:
+                        self.game_rooms.remove(room)
+                return
+
+
+    def handle_messages(self, event: threading.Event):
+        while self.run and not event.is_set():
+            try:
+                data, client_address = self.server_input_socket.recvfrom(1024)
+            except Exception as e: print(e, 'chuuuuuuuuuj')
+
+            # Checks if the device connected to the server
             if client_address not in self.connected_clients:
                 continue
             
+            # Gets the position of the sender in the self.game_rooms
             for room in self.game_rooms:
                 if client_address in room:
                     index = room.index(client_address)
                     game_room = room
+
+            # Accept input only if the game started
             if len(game_room) != 3:
-                print(len(game_room))
                 continue
             
-            print(game_room, 'gamerooom')
-            try:
-                if index == 0:
-                    game_room[2].client2.receive_info(data)
-                else:
-                    game_room[2].client1.receive_info(data)
-            except IndexError as e:
-                print(e)
-            print(time.time() - time1)
+            # Sends data to a correct client
+            if index == 0:
+                game_room[2].client1.receive_info(data)
+
+            else:
+                game_room[2].client2.receive_info(data)
         
 
 Server(sk.socket(sk.AF_INET, sk.SOCK_DGRAM), ('0.0.0.0', 12345),
-       sk.socket(sk.AF_INET, sk.SOCK_DGRAM), ('0.0.0.0', 12346))
+       sk.socket(sk.AF_INET, sk.SOCK_STREAM), ('0.0.0.0', 12346))
