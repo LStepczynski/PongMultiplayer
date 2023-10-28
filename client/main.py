@@ -8,14 +8,14 @@ import socket
 
 class Game:
     def __init__(self, server_address, name) -> None:
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server_address = server_address
         self.name = name
 
         self.root = pg.display.set_mode((gp.WIDTH, gp.HEIGHT))
         pg.display.set_caption(gp.TITLE)
 
-        self.client_socket.connect(server_address)
+        self.client_socket.sendto("".encode(), (server_address[0], server_address[1]+1))
 
         self.player = Racket(self.root, (50, gp.HEIGHT//2-100), (50, 200))
         self.enemy = Racket(self.root, (gp.WIDTH-100, gp.HEIGHT//2-100), (50, 200))
@@ -47,20 +47,28 @@ class Game:
         self.ball.draw()
 
     def send_commands(self, keys_pressed):
-        if keys_pressed[pg.K_w]:
-            self.client_socket.send(pickle.dumps('w'))
-            print('w')
-        if keys_pressed[pg.K_s]:
-            self.client_socket.send(pickle.dumps('s'))
-            print('a')
-        else:
-            self.client_socket.send(pickle.dumps(''))
+        try:
+            if keys_pressed[pg.K_w]:
+                print('w')
+                self.client_socket.sendto(pickle.dumps('w'), self.server_address)
+            if keys_pressed[pg.K_s]:
+                print('a')
+                self.client_socket.sendto(pickle.dumps('s'), self.server_address)
+        except Exception as e:
+            self.run = False
+            self.client_socket.close()
+            print(e)
         
     def recieve_commads(self):
         while self.run:
-            info = pickle.loads(self.client_socket.recv(1024))
-            self.player.set(info[0])
-            self.enemy.set(info[1])
-            self.ball.set(info[2])
+            try:
+                info = pickle.loads(self.client_socket.recv(1024))
+                self.player.set(info[0])
+                self.enemy.set(info[1])
+                self.ball.set(info[2])
+            except Exception as e:
+                self.run = False
+                self.client_socket.close()
+                print(e)
 
-Game(('192.168.0.89', 12345), input("name: "))
+Game(('25.55.142.184', 12345), input("name: "))
