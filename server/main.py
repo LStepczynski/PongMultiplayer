@@ -1,115 +1,84 @@
-from config import Game_properties as gp
-from game_room import Game_room
-import socket as sk
 import threading
+import json
+import socket
 import time
 
-
 class Server:
-    def __init__(self, server_input_socket: sk.socket, server_input_address, 
-                 server_init_socket: sk.socket, server_init_address):
-        
-        # Socket used for the game
-        self.server_input_socket = server_input_socket 
-        self.server_input_address = server_input_address
+    def __init__(self):
+        self.server_password = 'greensock'
 
-        # Socket used to init a connection
-        self.server_init_socket = server_init_socket
-        self.server_init_address = server_init_address
+        self.connection_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connection_socket.bind(('localhost', 12345))
+
+        self.info_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.info_socket.bind(('localhost', 12346))
 
         self.connected_clients = []
-        self.game_rooms = []
-        self.waiting = False # Variable storing if someone is waiting for a game
-
-        self.server_input_socket.bind(self.server_input_address)
-        self.server_init_socket.bind(self.server_init_address)
-        
-        print("Server is listening for connections...")
-
         self.run = True
+
+        self.message_manager = threading.Thread(target=self.handle_messages)
+        self.message_manager.start()
+
+        threading.Thread(target=self.debug).start()
+
+    
+    def main(self):
         while self.run:
-            # Wait for a client to connect
-            self.server_init_socket.listen()
-
-            connection, client_address = self.server_init_socket.accept()
-            connection.settimeout(15)
-
-            # Create a threading event
-            e = threading.Event()
-
-            # Start lisening for input
-            t1 = threading.Thread(target=self.handle_messages, args=(e,))
-            t1.start()
-
-            # Start tesing the connection
-            t2 = threading.Thread(target=self.handle_connection, args=(connection, e, client_address,))
-            t2.start()
-            print('a')
-
-
-            # Handles creating and joining game rooms
-            if self.waiting:
-                self.game_rooms[-1][1] = client_address
-                threading.Thread(target=self.handle_game, args=(self.game_rooms[-1],)).start()
-
-            else:
-                self.game_rooms.append([client_address, None])
+            self.connection_socket.listen()
+            conn, _ = self.connection_socket.accept()
+            addr, password = json.loads(conn.recv(1024).decode('utf-8'))
             
-            self.waiting = not self.waiting
+            if password != self.server_password:
+                conn.close()
+                continue
 
-            # Appends the client to the connected clients
-            self.connected_clients.append(client_address)
+            addr = tuple(addr)
+
+            conn.settimeout(15)
+
+            self.connected_clients.append(addr)
+
+            threading.Thread(target=self.handle_connection, args=(conn, addr)).start()
 
 
-    def handle_game(self, game_room):
-        self.game_rooms[-1].append(Game_room(game_room, self.server_input_socket))
-
-
-    def handle_connection(self, connection: sk.socket, event: threading.Event, address):
+    def handle_messages(self):
         while self.run:
-            print(self.connected_clients)
-            print(self.game_rooms, "--- game")
             try:
-                print(connection.recv(1024), "<---------")
+                data, addr = self.info_socket.recvfrom(1024)
+                
+                if addr not in self.connected_clients:
+                    continue
+
+                print(f"{addr} : {json.loads(data.decode('utf-8'))}")
+                
             except Exception as e:
-                print(e, "ODLLLLLLLLLLLLLLOMCASWDWADAWDWA")
-                connection.close()
-                event.set()
-                self.waiting = not self.waiting
-                self.connected_clients.remove(address)
-                for room in self.game_rooms:
-                    if address in room:
-                        self.game_rooms.remove(room)
+                print(e)
                 return
 
 
-    def handle_messages(self, event: threading.Event):
-        while self.run and not event.is_set():
+    def handle_connection(self, conn: socket.socket, addr):
+        while self.run:
             try:
-                data, client_address = self.server_input_socket.recvfrom(1024)
-            except Exception as e: print(e, 'chuuuuuuuuuj')
+                data = conn.recv(1024)
+                if not data:  # This checks for the empty bytes object signaling a closed connection
+                    print('dc')
+                    self.connected_clients.remove(addr)
+                    return
+                print('connection recv')
+            except Exception as e:
+                print(f'Exception: {e}')
+                print('dc')
+                self.connected_clients.remove(addr)
+                return
 
-            # Checks if the device connected to the server
-            if client_address not in self.connected_clients:
-                continue
             
-            # Gets the position of the sender in the self.game_rooms
-            for room in self.game_rooms:
-                if client_address in room:
-                    index = room.index(client_address)
-                    game_room = room
-
-            # Accept input only if the game started
-            if len(game_room) != 3:
-                continue
-            
-            # Sends data to a correct client
-            if index == 0:
-                game_room[2].client1.receive_info(data)
-
-            else:
-                game_room[2].client2.receive_info(data)
+    
+    def debug(self):
+        """TEMPORARY FUNCTION"""
+        while self.run:
+            time.sleep(3)
+            print(self.connected_clients)
         
 
-Server(sk.socket(sk.AF_INET, sk.SOCK_DGRAM), ('0.0.0.0', 12345),
-       sk.socket(sk.AF_INET, sk.SOCK_STREAM), ('0.0.0.0', 12346))
+s = Server()
+s.main()
