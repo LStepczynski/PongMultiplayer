@@ -1,3 +1,5 @@
+from config import Game_properties as gp
+from game import Game
 import threading
 import json
 import socket
@@ -10,16 +12,18 @@ class Client:
 
         self.connection_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connection_addr = ('localhost', 12345)
-        self.connection_socket.connect(self.connection_addr)
 
         self.info_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.info_socket.bind(('localhost', 0))
         self.info_addr = ('localhost', 12346)
 
-        self.connection_socket.send(json.dumps((self.info_socket.getsockname(), self.server_password)).encode('utf-8'))
-
         self.run = True
 
+        Game(self)
+
+    def connect(self):
+        self.connection_socket.connect(self.connection_addr)
+        self.connection_socket.send(json.dumps((self.info_socket.getsockname(), self.server_password)).encode('utf-8'))
         threading.Thread(target=self.pulse).start()
 
 
@@ -33,6 +37,16 @@ class Client:
                 self.run = False
 
     
+    def receive_commands(self):
+        while self.run:
+            try:
+                data, addr = self.info_socket.recvfrom(1024)
+                data = json.loads(data.decode('utf-8'))
+                print(data)
+            except Exception as e:
+                print(e)
+
+
     def main(self):
         while self.run:
             command = input()
