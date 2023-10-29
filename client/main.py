@@ -11,11 +11,12 @@ class Client:
         self.server_password = 'greensock'
 
         self.connection_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connection_addr = ('localhost', 12345)
+        self.connection_addr = ('192.168.0.89', 12345)
 
         self.info_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.info_socket.bind(('localhost', 0))
-        self.info_addr = ('localhost', 12346)
+        # self.info_socket.bind((input("Input your IP address: "), 0))
+        self.info_socket.bind(("192.168.0.89", 0))
+        self.info_addr = ('192.168.0.89', 12346)
 
         self.run = True
 
