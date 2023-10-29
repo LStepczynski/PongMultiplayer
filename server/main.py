@@ -11,10 +11,10 @@ class Server:
         self.server_password = 'greensock'
 
         self.connection_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connection_socket.bind(('localhost', 12345))
+        self.connection_socket.bind(('0.0.0.0', 12345))
 
         self.info_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.info_socket.bind(('localhost', 12346))
+        self.info_socket.bind(('0.0.0.0', 12346))
 
         self.connected_clients = []
         self.game_rooms = []
@@ -61,8 +61,6 @@ class Server:
                 
                 if addr not in self.connected_clients:
                     continue
-
-                print(json.loads(data.decode('utf-8')))
 
                 for room in self.game_rooms:
                     if addr in room:
