@@ -1,74 +1,61 @@
-from config import Colors, Game_properties as gp
-from objects import Racket, Ball
+from config import Game_properties as gp
+from game import Game
 import threading
-import pygame as pg
-import pickle
+import json
 import socket
+import time
 
 
-class Game:
-    def __init__(self, server_address, name) -> None:
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.server_address = server_address
-        self.name = name
+class Client:
+    def __init__(self):
+        self.server_password = 'greensock'
 
-        self.root = pg.display.set_mode((gp.WIDTH, gp.HEIGHT))
-        pg.display.set_caption(gp.TITLE)
+        self.connection_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connection_addr = ('localhost', 12345)
 
-        self.client_socket.sendto("".encode(), (server_address[0], server_address[1]+1))
+        self.info_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.info_socket.bind(('localhost', 0))
+        self.info_addr = ('localhost', 12346)
 
-        self.player = Racket(self.root, (50, gp.HEIGHT//2-100), (50, 200))
-        self.enemy = Racket(self.root, (gp.WIDTH-100, gp.HEIGHT//2-100), (50, 200))
-        self.ball = Ball(self.root, (gp.WIDTH//2-25, gp.HEIGHT//2-25), (50, 50))
-
-        self.clock = pg.time.Clock()
         self.run = True
-        threading.Thread(target=self.recieve_commads).start()
-        while self.run:
-            self.clock.tick(gp.TICK_RATE)
-            for event in pg.event.get():
-                if event.type == pg.QUIT:
-                    self.run = False
-                    self.client_socket.close()
 
-            keys_pressed = pg.key.get_pressed()
+        Game(self)
 
-            self.send_commands(keys_pressed)
-            self.draw()
+    def connect(self):
+        self.connection_socket.connect(self.connection_addr)
+        self.connection_socket.send(json.dumps((self.info_socket.getsockname(), self.server_password)).encode('utf-8'))
+        threading.Thread(target=self.pulse).start()
 
 
-            pg.display.update()
-            
-
-    def draw(self):
-        self.root.fill(Colors.BLACK)
-        self.player.draw()
-        self.enemy.draw()
-        self.ball.draw()
-
-    def send_commands(self, keys_pressed):
-        try:
-            if keys_pressed[pg.K_w]:
-                print('w')
-                self.client_socket.sendto(pickle.dumps('w'), self.server_address)
-            if keys_pressed[pg.K_s]:
-                print('a')
-                self.client_socket.sendto(pickle.dumps('s'), self.server_address)
-        except Exception as e:
-            self.run = False
-            self.client_socket.close()
-            print(e)
-        
-    def recieve_commads(self):
+    def pulse(self):
         while self.run:
             try:
-                info = pickle.loads(self.client_socket.recv(1024))
-                self.player.set(info[0])
-                self.enemy.set(info[1])
-                self.ball.set(info[2])
+                self.connection_socket.send(json.dumps('pulse').encode('utf-8'))
+                time.sleep(5)
             except Exception as e:
+                print(e)
                 self.run = False
-                self.client_socket.close()
+
+    
+    def receive_commands(self):
+        while self.run:
+            try:
+                data, addr = self.info_socket.recvfrom(1024)
+                data = json.loads(data.decode('utf-8'))
+                print(data)
+            except Exception as e:
                 print(e)
 
-Game(('25.55.142.184', 12345), input("name: "))
+
+    def main(self):
+        while self.run:
+            command = input()
+            if command == 'dc':
+                self.connection_socket.close()
+            else:
+                self.info_socket.sendto(json.dumps(command).encode('utf-8'), self.info_addr)
+
+
+
+c = Client()
+c.main()

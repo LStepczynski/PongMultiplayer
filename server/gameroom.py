@@ -1,40 +1,41 @@
 from config import Game_properties as gp
 import threading
-import pickle
 import random
+import json
 import time
 
 
 class Client:
-    def __init__(self, game_room, address, player, enemy, ball) -> None:
+    def __init__(self, server, game_room, address, player, enemy, ball) -> None:
+        self.server = server
         self.game_room = game_room
         self.address = address
         self.player = player
         self.enemy = enemy
         self.ball = ball
         self.info = None
-        self.connected = True
-    
+
     def receive_info(self, info):
         try:
-            self.info = pickle.loads(info)
+            self.info = json.loads(info.decode('utf-8'))
             print(self.info)
             self.update_player()
         except Exception as e:
-            print(e, 1)
+            print(e)
 
-    def send_info(self):
-        try:
-            self.game_room.server_socket.sendto(pickle.dumps((self.player, self.enemy, self.ball)), self.address)
-        except Exception as e:
-            self.connected = False
-            self.game_room.run = False
-            print(e, 2)
 
-    def update(self, direction):
-        self.update_ball(direction)
-        self.update_player()
-    
+    def update_player(self):
+        if self.info == None:
+            return
+        for char in self.info:
+            if char == '':
+                continue
+            if char == 'w':
+                self.player[1] -= gp.VELOCITY
+            if char == 's':
+                self.player[1] += gp.VELOCITY
+
+
     def update_ball(self, direction):
         for _ in range(10):
             if direction == [True, True]:
@@ -65,46 +66,41 @@ class Client:
             if self.ball[1] + gp.BALL_VELOCITY + self.ball[3] - 5 >= gp.HEIGHT:
                 direction[1] = True
 
-    def update_player(self):
-        if self.info == None:
-            return
-        for char in self.info:
-            if char == '':
-                continue
-            if char == 'w':
-                self.player[1] -= gp.VELOCITY
-            if char == 's':
-                self.player[1] += gp.VELOCITY
 
-    def disconect(self):
-        self.socket.close()
-        self.connected = False
+    def send_info(self):
+        try:
+            self.server.info_socket.sendto(json.dumps((self.player, self.enemy, self.ball)).encode("utf-8"), self.address)
+        except Exception as e:
+            self.connected = False
+            self.server.run = False
+            print(e, 2)
 
-        
 
-class Game_room:
-    def __init__(self, game_room, server_socket):
-        self.run = True  
-
+class Gameroom:
+    def __init__(self, server, game_room):
+        self.server = server
         self.game_room = game_room
-        self.server_socket = server_socket
 
-        self.client1 = Client(self,
-                              game_room[0],  # Client address
-                              [50, gp.HEIGHT // 2 - 100, 50, 200],
-                              [gp.WIDTH - 100, gp.HEIGHT // 2 - 100, 50, 200],
-                              [gp.WIDTH // 2 - 25, gp.HEIGHT // 2 - 25, 50, 50])
+        self.run = True
 
-        self.client2 = Client(self,
-                              game_room[1],  # Client address
-                              [50, gp.HEIGHT // 2 - 100, 50, 200],
-                              [gp.WIDTH - 100, gp.HEIGHT // 2 - 100, 50, 200],
-                              [gp.WIDTH // 2 - 25, gp.HEIGHT // 2 - 25, 50, 50])
+        self.client1 = Client(self.server,
+                            self.game_room,
+                            self.game_room[0],
+                            [50, gp.HEIGHT // 2 - 100, 50, 200],
+                            [gp.WIDTH - 100, gp.HEIGHT // 2 - 100, 50, 200],
+                            [gp.WIDTH // 2 - 25, gp.HEIGHT // 2 - 25, 50, 50])
 
+        self.client2 = Client(self.server,
+                            self.game_room,
+                            self.game_room[1],
+                            [50, gp.HEIGHT // 2 - 100, 50, 200],
+                            [gp.WIDTH - 100, gp.HEIGHT // 2 - 100, 50, 200],
+                            [gp.WIDTH // 2 - 25, gp.HEIGHT // 2 - 25, 50, 50])
+        
         self.direction = [bool(random.randint(0, 1)), bool(random.randint(0, 1))]
 
-        self.loop_thread = threading.Thread(target=self.main_loop)
-        self.loop_thread.start()
+        threading.Thread(target=self.main_loop).start()
+
 
     def main_loop(self):
         while self.run:
@@ -123,8 +119,8 @@ class Game_room:
             except Exception as e:  # General exception to catch any error
                 self.run = False
                 print(f"An error occurred: {e}")
+    
 
     def exchange(self):
         self.client1.enemy[1] = self.client2.player[1]
         self.client2.enemy[1] = self.client1.player[1]
-
